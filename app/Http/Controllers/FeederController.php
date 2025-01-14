@@ -46,6 +46,7 @@ class FeederController extends Controller
                 json_encode($motorStatus->toArray())
             );
 
+            session()->forget('duration');
             return back()->with('success', 'Permintaan untuk memberikan makanan telah dikirim.');
         } catch (\Exception $e) {
             Log::error('Error in FeederController feed: ' . $e->getMessage());
@@ -73,59 +74,58 @@ class FeederController extends Controller
     }
 
     public function stop()
-{
-    try {
-        $motorStatus = MotorLog::first();
+    {
+        try {
+            $motorStatus = MotorLog::first();
 
-        if ($motorStatus && $motorStatus->status == 1) {
-            
-            if ($motorStatus->updated_at->isPast()) {
-                $durationInSeconds = $motorStatus->updated_at->diffInSeconds(Carbon::now());
+            if ($motorStatus && $motorStatus->status == 1) {
+
+                if ($motorStatus->updated_at->isPast()) {
+                    $durationInSeconds = $motorStatus->updated_at->diffInSeconds(Carbon::now());
+                } else {
+                    $durationInSeconds = 0;
+                }
+
+                $duration = $this->formatDuration($durationInSeconds);
+
+                $motorStatus->update([
+                    'status' => 0,
+                    'timestamp' => Carbon::now(),
+                ]);
+
+                Log::info('Motor stopped. Duration: ' . $durationInSeconds . ' seconds');
             } else {
-                $durationInSeconds = 0;
+                return back()->with('info', 'Feeder sudah dalam keadaan mati.');
             }
 
-            $duration = $this->formatDuration($durationInSeconds);
+            $this->mqttService->publish(
+                'BnEsp32/MotorControl',
+                json_encode($motorStatus->toArray())
+            );
 
-            $motorStatus->update([
-                'status' => 0,
-                'timestamp' => Carbon::now(),
+            $duration = $this->formatDuration(round($durationInSeconds));
+            session(['duration' => $duration]);
+            return back()->with([
+                'success' => 'Proses pemberian makanan telah dihentikan.',
             ]);
-
-            Log::info('Motor stopped. Duration: ' . $durationInSeconds . ' seconds');
-        } else {
-            return back()->with('info', 'Feeder sudah dalam keadaan mati.');
+        } catch (\Exception $e) {
+            Log::error('Error in FeederController stop: ' . $e->getMessage());
+            return response()->json(['message' => 'Data gagal ditambahkan: ' . $e->getMessage()], 500);
         }
-
-        $this->mqttService->publish(
-            'BnEsp32/MotorControl',
-            json_encode($motorStatus->toArray())
-        );
-
-        $duration = $this->formatDuration(round($durationInSeconds));
-        session(['duration' => $duration]);
-        return back()->with([
-            'success' => 'Proses pemberian makanan telah dihentikan.',
-        ]);
-
-    } catch (\Exception $e) {
-        Log::error('Error in FeederController stop: ' . $e->getMessage());
-        return response()->json(['message' => 'Data gagal ditambahkan: ' . $e->getMessage()], 500);
     }
-}
 
-    
 
-private function formatDuration($seconds)
-{
-    if ($seconds < 60) {
-        return $seconds . ' Detik';
-    } elseif ($seconds < 3600) {
-        return floor($seconds / 60) . ' Menit ' . ($seconds % 60) . ' Detik';
-    } else {
-        return floor($seconds / 3600) . ' Jam ' . floor(($seconds % 3600) / 60) . ' Menit';
+
+    private function formatDuration($seconds)
+    {
+        if ($seconds < 60) {
+            return $seconds . ' Detik';
+        } elseif ($seconds < 3600) {
+            return floor($seconds / 60) . ' Menit ' . ($seconds % 60) . ' Detik';
+        } else {
+            return floor($seconds / 3600) . ' Jam ' . floor(($seconds % 3600) / 60) . ' Menit';
+        }
     }
-}
 
     // public function feedNow()
     // {
@@ -141,15 +141,20 @@ private function formatDuration($seconds)
 
     public function scheduler(Request $r)
     {
-        DB::insert('INSERT INTO log_feed (`date`, `time`, `log`, `umur`, `berat`, `interval`) 
-            VALUES (?, ?, ?, ?, ?, ?)', [
-            now()->format('Y-m-d'),          // Current date
-            now()->format('H:i:s'),          // Current time
-            10,                              // Example log value
-            $r->AGE,               // Chick age
-            $r->FEED,              // Feed amount
-            $r->TIME,              // Time interval
+        // Insert new log entry and get the last inserted ID
+        $lastInsertId = DB::table('log_feed')->insertGetId([
+            'date' => now()->format('Y-m-d'),          // Current date
+            'time' => now()->format('H:i:s'),          // Current time
+            'log' => 10,                               // Example log value
+            'umur' => $r->AGE,                         // Chick age
+            'berat' => $r->FEED,                       // Feed amount
+            'interval' => $r->TIME,                    // Time interval
         ]);
+    
+        // Update all other log entries to set `log` to 0, except the newly inserted one
+        DB::table('log_feed')
+            ->where('id', '!=', $lastInsertId) // Exclude the newly inserted log
+            ->update(['log' => 0]);
 
         // $feedData = [
         //     'feed' => $r->FEED,

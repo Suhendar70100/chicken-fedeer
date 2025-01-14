@@ -12,8 +12,8 @@ class ResetLogStatus extends Command
 
     public function handle()
     {
-        LogModel::query()->update(['log' => 10]);
+        LogModel::query()->update(['log' => 0]);
 
-        $this->info('All log statuses have been reset to 10.');
+        $this->info('All log statuses have been reset to 0.');
     }
 }
