@@ -151,9 +151,9 @@ class FeederController extends Controller
             'interval' => $r->TIME,                    // Time interval
         ]);
     
-        // Update all other log entries to set `log` to 0, except the newly inserted one
         DB::table('log_feed')
-            ->where('id', '!=', $lastInsertId) // Exclude the newly inserted log
+            ->where('log', '!=', 1)
+            ->where('id', '!=', $lastInsertId)
             ->update(['log' => 0]);
 
         // $feedData = [

@@ -16,39 +16,21 @@ Schedule::command('log:reset-status')->dailyAt('18:00');
 
 Schedule::call(function () {
     $now = Carbon::now();
+    $log = LogModel::where('log', 10)->first();
 
-    $logs = LogModel::where('log', 10) 
-        ->get();
-
-    $publishTimes = [];
-
-    foreach ($logs as $log) {
+    if ($log) {
         $logTime = Carbon::createFromTimeString($log->time);
         $interval = (int) $log->interval; 
 
         $publishTime = $logTime->addHours($interval)->subMinutes(3);
-
-        $publishTimes[] = [
-            'log' => $log,
-            'publish_time' => $publishTime,
-        ];
-    }
-
-    usort($publishTimes, function ($a, $b) {
-        return $a['publish_time'] <=> $b['publish_time'];
-    });
-
-    foreach ($publishTimes as $item) {
-        $log = $item['log'];
-        $publishTime = $item['publish_time'];
 
         Log::info("Log ID: {$log->id}, Interval: {$interval}, Log Time: {$logTime}, Publish Time: {$publishTime}");
 
         if ($publishTime->isSameMinute($now) || $publishTime->isPast()) {
             PublishLogFeedJob::dispatch($log);
             Log::info("Log dengan ID {$log->id} dipublikasikan ke MQTT.");
-
-            break;
         }
+    } else {
+        Log::info("Tidak ada log dengan ID 10.");
     }
 })->everyMinute();

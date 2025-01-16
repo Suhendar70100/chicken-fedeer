@@ -21,45 +21,41 @@ class MqttListener extends Command
     }
 
     public function handle()
-{
-    try {
-        $client = $this->mqttService->getClient();
-        $this->mqttService->connect();
+    {
+        try {
+            $client = $this->mqttService->getClient();
+            $this->mqttService->connect();
 
-        $client->subscribe('BnEsp32/MotorStatus', function (string $topic, string $message) {
-            $this->processMessage($topic, $message);
-        }, 1);
+            $client->subscribe('BnEsp32/MotorStatus', function (string $topic, string $message) {
+                $this->processMessage($topic, $message);
+            }, 1);
 
-        Log::info('Subscribed to topic: BnEsp32/MotorStatus');
+            Log::info('Subscribed to topic: BnEsp32/MotorStatus');
 
-        while (true) {
-            try {
-                if (!$client->isConnected()) {
-                    Log::warning('Connection lost. Attempting to reconnect...');
-                    $this->mqttService->connect();
+            while (true) {
+                try {
+                    if (!$client->isConnected()) {
+                        Log::warning('Connection lost. Attempting to reconnect...');
+                        $this->mqttService->connect();
+                    }
+
+                    $client->loop(true, 1000);
+                } catch (\Exception $e) {
+                    Log::error('Error in MQTT loop: ' . $e->getMessage());
+                    sleep(1); 
                 }
-        
-                $client->loop(true, 1000);
-                Log::info('MQTT loop running...');
-            } catch (\Exception $e) {
-                Log::error('Error in MQTT loop: ' . $e->getMessage());
-                $this->mqttService->connect();
-                sleep(1); 
             }
+        } catch (\Exception $e) {
+            Log::error('Error in MQTT Listener: ' . $e->getMessage());
         }
-        
-    } catch (\Exception $e) {
-        Log::error('Error in MQTT Listener: ' . $e->getMessage());
     }
-}
-
 
     private function processMessage(string $topic, string $message)
     {
         Log::info("Message received on topic '{$topic}': {$message}");
 
         $data = json_decode($message, true);
-        if (is_array($data) && isset($data['status']) && isset($data['timestamp'])) {
+        if (is_array($data) && isset($data['status'], $data['timestamp'])) {
             StoreMotorStatusJob::dispatch($data);
             Log::info('Dispatched job to store motor status: ' . json_encode($data));
         } else {

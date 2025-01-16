@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use App\Services\MqttService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log as LogFacade; // Import facade Log
 
 class PublishLogFeedJob implements ShouldQueue
@@ -42,7 +43,9 @@ class PublishLogFeedJob implements ShouldQueue
         ];
 
         $mqttService->publish('BnEsp32/Interval', json_encode($intervalData));
-
+        DB::table('log_feed')
+        ->where('log', 1)
+        ->update(['log' => 0]);
         $this->log->update(['log' => 1]);
     }
 }
