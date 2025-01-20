@@ -2,63 +2,25 @@
 
 namespace App\Services;
 
-use PhpMqtt\Client\MqttClient;
-use PhpMqtt\Client\ConnectionSettings;
+use PhpMqtt\Client\Facades\MQTT;
 use Illuminate\Support\Facades\Log;
 
 class MqttService
 {
     protected $client;
-    protected $host;
-    protected $port;
-    protected $clientId;
-    protected $username;
-    protected $password;
 
     public function __construct()
     {
-        $this->host = env('MQTT_HOST', 'broker.hivemq.com');
-        $this->port = env('MQTT_PORT', 1883);
-        $this->clientId = env('MQTT_CLIENT_ID', 'laravel-client-' . uniqid());
-        $this->username = env('MQTT_USERNAME', '');
-        $this->password = env('MQTT_PASSWORD', '');
-
-        $this->client = new MqttClient($this->host, $this->port, $this->clientId);
+        $this->client = MQTT::connection();
     }
-
-    public function connect()
-{
-    $connectionSettings = (new ConnectionSettings)
-        ->setKeepAliveInterval(120)
-        ->setConnectTimeout(10)
-        ->setMaxReconnectAttempts(10)
-        ->setDelayBetweenReconnectAttempts(5000);
-
-    if (!empty($this->username)) {
-        $connectionSettings->setUsername($this->username);
-        if (!empty($this->password)) {
-            $connectionSettings->setPassword($this->password);
-        }
-    }
-
-    try {
-        $this->client->connect($connectionSettings, true);
-        Log::info('Connected to MQTT broker.');
-    } catch (\Exception $e) {
-        Log::error('Failed to connect to MQTT broker: ' . $e->getMessage());
-        throw $e;
-    }
-}
-
 
     public function publish(string $topic, string $message, int $qos = 1, bool $retain = false)
     {
         try {
             if (!$this->client->isConnected()) {
-                $this->connect();
+                $this->client = MQTT::connection(); // Reconnect if not connected
             }
             $this->client->publish($topic, $message, $qos, $retain);
-            // $this->client->disconnect();
             Log::info("Published message to topic {$topic}: {$message}");
         } catch (\Exception $e) {
             Log::error("Failed to publish message: " . $e->getMessage());
@@ -66,8 +28,32 @@ class MqttService
         }
     }
 
-    public function getClient(): MqttClient
+    public function subscribe(string $topic, callable $callback)
     {
-        return $this->client;
+        try {
+            if (!$this->client->isConnected()) {
+                $this->client = MQTT::connection(); // Reconnect if not connected
+            }
+            $this->client->subscribe($topic, $callback);
+            Log::info("Subscribed to topic: {$topic}");
+        } catch (\Exception $e) {
+            Log::error("Failed to subscribe to topic: " . $e->getMessage());
+        }
+    }
+
+    public function loop()
+    {
+        while (true) {
+            try {
+                if (!$this->client->isConnected()) {
+                    $this->client = MQTT::connection(); // Reconnect if not connected
+                }
+                $this->client->loop();
+            } catch (\Exception $e) {
+                Log::error("Error in MQTT loop: " . $e->getMessage());
+                sleep(1); // Wait before retrying
+            }
+            sleep(1); // Adjust the sleep time as necessary
+        }
     }
 }

@@ -21,38 +21,19 @@ class MqttListener extends Command
     }
 
     public function handle()
-{
-    try {
-        $client = $this->mqttService->getClient();
-        $this->mqttService->connect();
+    {
+        try {
+            // Subscribe to the topic
+            $this->mqttService->subscribe('BnEsp32/MotorStatus1', function ($topic, $message) {
+                $this->processMessage($topic, $message);
+            });
 
-        $client->subscribe('BnEsp32/MotorStatus', function (string $topic, string $message) {
-            $this->processMessage($topic, $message);
-        }, 1);
-
-        Log::info('Subscribed to topic: BnEsp32/MotorStatus');
-
-        while (true) {
-            try {
-                if (!$client->isConnected()) {
-                    Log::warning('Connection lost. Attempting to reconnect...');
-                    $this->mqttService->connect();
-                }
-        
-                $client->loop(true, 1000);
-                Log::info('MQTT loop running...');
-            } catch (\Exception $e) {
-                Log::error('Error in MQTT loop: ' . $e->getMessage());
-                $this->mqttService->connect();
-                sleep(1); 
-            }
+            Log::info('Subscribed to topic: BnEsp32/MotorStatus1');
+            $this->mqttService->loop();
+        } catch (\Exception $e) {
+            Log::error('Error in MQTT Listener: ' . $e->getMessage());
         }
-        
-    } catch (\Exception $e) {
-        Log::error('Error in MQTT Listener: ' . $e->getMessage());
     }
-}
-
 
     private function processMessage(string $topic, string $message)
     {

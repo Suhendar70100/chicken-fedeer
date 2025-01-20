@@ -10,28 +10,32 @@ use App\Models\Schedule;
 use Illuminate\Http\Request;
 use App\Services\MqttService;
 use PhpMqtt\Client\MqttClient;
-use PhpMqtt\Client\Facades\MQTT;
+// use PhpMqtt\Client\Facades\MQTT;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use PhpMqtt\Client\Exceptions\MqttClientException;
+use PhpMqtt\Client\Facades\MQTT;
+
 
 class FeederController extends Controller
 {
-    protected $mqttService;
+    protected $mqttClient;
 
-    public function __construct(MqttService $mqttService)
+    public function __construct()
     {
-        $this->mqttService = $mqttService;
+        $this->mqttClient = MQTT::connection();
     }
 
     public function feed(Request $request)
     {
         try {
+            // Data untuk memperbarui atau membuat log motor
             $dataToUpdate = [
                 'status' => 1,
                 'timestamp' => Carbon::now(),
             ];
 
+            // Cek apakah log motor sudah ada, lalu perbarui atau buat baru
             $motorStatus = MotorLog::first();
             if ($motorStatus) {
                 $motorStatus->update($dataToUpdate);
@@ -39,18 +43,32 @@ class FeederController extends Controller
                 $motorStatus = MotorLog::create($dataToUpdate);
             }
 
-            Log::info('MotorLog created or updated:', $motorStatus->toArray());
+            Log::info('MotorLog berhasil dibuat atau diperbarui:', $motorStatus->toArray());
 
-            $this->mqttService->publish(
-                'BnEsp32/MotorControl',
-                json_encode($motorStatus->toArray())
-            );
+            // Pastikan koneksi MQTT aktif sebelum publish
+            if (!$this->mqttClient->isConnected()) {
+                $this->mqttClient = MQTT::connection();
+            }
 
+            // Data yang akan dikirim ke broker MQTT
+            $data = [
+                'status' => $motorStatus->status,
+                'timestamp' => $motorStatus->timestamp->toDateTimeString(),
+            ];
+
+            // Publish pesan ke topik MQTT
+            $this->mqttClient->publish('BnEsp32/MotorControl', json_encode($data));
+
+            // Hapus sesi durasi setelah pemberian pakan selesai
             session()->forget('duration');
+
             return back()->with('success', 'Permintaan untuk memberikan makanan telah dikirim.');
+        } catch (MqttClientException $e) {
+            Log::error('Kesalahan MQTT dalam FeederController feed: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal mengirim pesan ke broker MQTT.'], 500);
         } catch (\Exception $e) {
-            Log::error('Error in FeederController feed: ' . $e->getMessage());
-            return response()->json(['message' => 'Data gagal ditambahkan: ' . $e->getMessage()], 500);
+            Log::error('Kesalahan umum dalam FeederController feed: ' . $e->getMessage());
+            return response()->json(['message' => 'Terjadi kesalahan saat memproses permintaan.'], 500);
         }
     }
 
@@ -98,10 +116,18 @@ class FeederController extends Controller
                 return back()->with('info', 'Feeder sudah dalam keadaan mati.');
             }
 
-            $this->mqttService->publish(
-                'BnEsp32/MotorControl',
-                json_encode($motorStatus->toArray())
-            );
+            if (!$this->mqttClient->isConnected()) {
+                $this->mqttClient = MQTT::connection();
+            }
+
+            // Data yang akan dikirim ke broker MQTT
+            $data = [
+                'status' => $motorStatus->status,
+                'timestamp' => $motorStatus->timestamp->toDateTimeString(),
+            ];
+
+            // Publish pesan ke topik MQTT
+            $this->mqttClient->publish('BnEsp32/MotorControl', json_encode($data));
 
             $duration = $this->formatDuration(round($durationInSeconds));
             session(['duration' => $duration]);

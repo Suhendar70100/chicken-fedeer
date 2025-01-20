@@ -40,11 +40,11 @@ return [
             'port' => env('MQTT_PORT', 1883),
 
             // The MQTT protocol version used for the connection.
-            'protocol' => MqttClient::MQTT_3_1,
+            'protocol' => MqttClient::MQTT_3_1_1,
 
             // A specific client id to be used for the connection. If omitted,
             // a random client id will be generated for each new connection.
-            'client_id' => env('MQTT_CLIENT_ID'),
+            'client_id' => env('MQTT_CLIENT_ID', 'laravel-client-' . uniqid()),
 
             // Whether a clean session shall be used and requested by the client.
             // A clean session will let the broker forget about subscriptions and
@@ -99,13 +99,13 @@ return [
 
                 // The timeouts (in seconds) used for the connection. Some of these settings
                 // are only relevant when using the event loop of the MQTT client.
-                'connect_timeout' => env('MQTT_CONNECT_TIMEOUT', 60),
-                'socket_timeout' => env('MQTT_SOCKET_TIMEOUT', 5),
-                'resend_timeout' => env('MQTT_RESEND_TIMEOUT', 10),
+                'connect_timeout' => env('MQTT_CONNECT_TIMEOUT', 120),
+                'socket_timeout' => env('MQTT_SOCKET_TIMEOUT', 20),
+                'resend_timeout' => env('MQTT_RESEND_TIMEOUT', 20),
 
                 // The interval (in seconds) in which the client will send a ping to the broker,
                 // if no other message has been sent.
-                'keep_alive_interval' => env('MQTT_KEEP_ALIVE_INTERVAL', 10),
+                'keep_alive_interval' => env('MQTT_KEEP_ALIVE_INTERVAL', 60),
 
                 // Additional settings for the optional auto-reconnect. The delay between reconnect attempts is in seconds.
                 'auto_reconnect' => [
