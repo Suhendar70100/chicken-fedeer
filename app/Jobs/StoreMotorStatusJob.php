@@ -38,7 +38,7 @@ class StoreMotorStatusJob implements ShouldQueue
     DB::beginTransaction();
 
     try {
-        if (isset($this->data['status']) && isset($this->data['timestamp']) && isset($this->data['log_id'])) {
+        if (is_array($this->data) && isset($this->data['status'], $this->data['timestamp'], $this->data['log_id'], $this->data['rotate'])) {
             $motorStatus = MotorLog::firstOrNew(['id' => 1]);
             $logStatus = ModelsLog::find($this->data['log_id']);
 
@@ -48,7 +48,7 @@ class StoreMotorStatusJob implements ShouldQueue
             ]);
 
             $logStatus->update([
-                'log' => 0
+                'rotasi' => $this->data['rotate'],
             ]);
 
             $motorStatus->save();

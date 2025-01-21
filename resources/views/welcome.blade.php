@@ -45,6 +45,7 @@
                             <th class="col-1">Umur</th>
                             <th class="col-1">Berat</th>
                             <th class="col-1">Interval</th>
+                            <th class="col-1">Rotasi</th>
                         </tr>
                     </thead>
                     <tbody id="log-body"> <!-- Pastikan ID ini ada -->
@@ -65,6 +66,7 @@
                                 <td>{{ $x->umur }} minggu</td>
                                 <td>{{ $x->berat }} gram</td>
                                 <td>{{ $x->interval }} jam</td>
+                                <td>{{ $x->rotasi }} kali</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -238,6 +240,7 @@ function fetchLogs() {
                     <td>${log.umur} minggu</td>
                     <td>${log.berat} gram</td>
                     <td>${log.interval} jam</td>
+                    <td>${log.rotasi} kali</td>
                 `;
                 logBody.appendChild(row);
             });

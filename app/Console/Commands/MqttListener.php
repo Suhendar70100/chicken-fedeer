@@ -26,27 +26,42 @@ class MqttListener extends Command
         $client = $this->mqttService->getClient();
         $this->mqttService->connect();
 
-        $client->subscribe('BnEsp32/MotorStatus', function (string $topic, string $message) {
-            $this->processMessage($topic, $message);
+        $client->subscribe('BnEsp32/MotorStatus1', function (string $topic, string $message) {
+            try {
+                $this->processMessage($topic, $message);
+            } catch (\Exception $e) {
+                Log::error('Error in subscription callback: ' . $e->getMessage());
+            }
         }, 1);
+        
 
-        Log::info('Subscribed to topic: BnEsp32/MotorStatus');
+        Log::info('Subscribed to topic: BnEsp32/MotorStatus1');
 
         while (true) {
             try {
                 if (!$client->isConnected()) {
                     Log::warning('Connection lost. Attempting to reconnect...');
                     $this->mqttService->connect();
+        
+                    // Re-subscribe setelah reconnect
+                    $client->subscribe('BnEsp32/MotorStatus1', function (string $topic, string $message) {
+                        try {
+                            $this->processMessage($topic, $message);
+                        } catch (\Exception $e) {
+                            Log::error('Error in subscription callback: ' . $e->getMessage());
+                        }
+                    }, 1);
+        
+                    Log::info('Re-subscribed to topic: BnEsp32/MotorStatus1');
                 }
         
                 $client->loop(true, 1000);
                 Log::info('MQTT loop running...');
             } catch (\Exception $e) {
                 Log::error('Error in MQTT loop: ' . $e->getMessage());
-                $this->mqttService->connect();
-                sleep(1); 
+                sleep(1); // Hindari reconnect terlalu sering
             }
-        }
+        }        
         
     } catch (\Exception $e) {
         Log::error('Error in MQTT Listener: ' . $e->getMessage());
@@ -59,7 +74,7 @@ class MqttListener extends Command
         Log::info("Message received on topic '{$topic}': {$message}");
 
         $data = json_decode($message, true);
-        if (is_array($data) && isset($data['status']) && isset($data['timestamp'])) {
+        if (is_array($data) && isset($data['status']) && isset($data['timestamp']) && isset($data['log_id']) && isset($data['rotate'])) {
             StoreMotorStatusJob::dispatch($data);
             Log::info('Dispatched job to store motor status: ' . json_encode($data));
         } else {

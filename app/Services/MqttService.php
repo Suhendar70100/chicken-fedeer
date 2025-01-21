@@ -29,7 +29,7 @@ class MqttService
     public function connect()
 {
     $connectionSettings = (new ConnectionSettings)
-        ->setKeepAliveInterval(120)
+        ->setKeepAliveInterval(60)
         ->setConnectTimeout(10)
         ->setMaxReconnectAttempts(10)
         ->setDelayBetweenReconnectAttempts(5000);

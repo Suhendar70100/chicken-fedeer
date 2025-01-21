@@ -17,6 +17,7 @@ class Log extends Model
         'umur',
         'berat',
         'interval',
+        'rotasi',
     ];
 
     use HasFactory;
