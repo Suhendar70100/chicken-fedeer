@@ -18,6 +18,7 @@ return new class extends Migration{
             $table->string('umur');
             $table->string('berat');
             $table->string('interval');
+            $table->integer('rotasi')->default(0);
             $table->timestamps();
         });
     }
