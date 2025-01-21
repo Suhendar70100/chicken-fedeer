@@ -13,6 +13,8 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote')->hourly();
 
 Schedule::command('log:reset-status')->dailyAt('18:00');
+Schedule::command('rotation:update')->everyMinute();
+
 
 Schedule::call(function () {
     $now = Carbon::now();

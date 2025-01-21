@@ -43,7 +43,6 @@ class MqttListener extends Command
                     Log::warning('Connection lost. Attempting to reconnect...');
                     $this->mqttService->connect();
         
-                    // Re-subscribe setelah reconnect
                     $client->subscribe('BnEsp32/MotorStatus1', function (string $topic, string $message) {
                         try {
                             $this->processMessage($topic, $message);
@@ -59,7 +58,7 @@ class MqttListener extends Command
                 Log::info('MQTT loop running...');
             } catch (\Exception $e) {
                 Log::error('Error in MQTT loop: ' . $e->getMessage());
-                sleep(1); // Hindari reconnect terlalu sering
+                sleep(1); 
             }
         }        
         
@@ -74,7 +73,7 @@ class MqttListener extends Command
         Log::info("Message received on topic '{$topic}': {$message}");
 
         $data = json_decode($message, true);
-        if (is_array($data) && isset($data['status']) && isset($data['timestamp']) && isset($data['log_id']) && isset($data['rotate'])) {
+        if (is_array($data) && isset($data['status']) && isset($data['timestamp']) && isset($data['log_id'])) {
             StoreMotorStatusJob::dispatch($data);
             Log::info('Dispatched job to store motor status: ' . json_encode($data));
         } else {
